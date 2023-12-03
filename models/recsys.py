@@ -7,7 +7,17 @@ from sklearn.neighbors import NearestNeighbors
 
 
 class CollaborativeFilteringRecSys:
+    """
+    Collaborative Filtering Recommender System using PCA and k-Nearest Neighbors.
+    """
     def __init__(self, pca_var=0.9, knn_neighbors=600):
+        """
+        Initialize CollaborativeFilteringRecSys.
+
+        Args:
+        - pca_var (float): Variance to be retained in PCA.
+        - knn_neighbors (int): Number of neighbors for k-Nearest Neighbors.
+        """
         self.pca_var = pca_var
         self.knn_neighbors = knn_neighbors
         self.distances = None
@@ -15,6 +25,13 @@ class CollaborativeFilteringRecSys:
         self.rating_matrix = None
 
     def fit(self, train_df: pd.DataFrame, movie_data: pd.DataFrame = None):
+        """
+        Fit the model.
+
+        Args:
+        - train_df (pd.DataFrame): DataFrame containing user-item ratings.
+        - movie_data (pd.DataFrame, optional): Additional movie data (columns: movie_id, title, release_date, etc.).
+        """
         self.rating_matrix = train_df.pivot(index="movie_id", columns="user_id", values="rating").fillna(0)
         if movie_data is None:
             total_item_matrix = self.rating_matrix
@@ -30,7 +47,16 @@ class CollaborativeFilteringRecSys:
         self.distances, self.neighbors = knn.kneighbors(X_train, n_neighbors=self.knn_neighbors)
 
     def calculate_rating(self, neighbors_dists, user_rating_history):
-        # calculate projected rating
+        """
+        Calculate rating based on user's rating history and neighbor distances.
+
+        Args:
+        - neighbors_dists (list): List of tuples (distance, index) for neighbors.
+        - user_rating_history (pd.Series): User's rating history.
+
+        Returns:
+        - float: Predicted rating.
+        """
         sum_sim = 0
         weighted_sum_ratings = 0
         for movie_dist, movie_index in neighbors_dists:
@@ -44,6 +70,17 @@ class CollaborativeFilteringRecSys:
         return weighted_sum_ratings / sum_sim
 
     def predict_movie_rating(self, user_id, movie_id, rated_neighbors):
+        """
+        Predict rating for a movie not seen by the user.
+
+        Args:
+        - user_id (int): User ID.
+        - movie_id (int): Movie ID.
+        - rated_neighbors (int): Number of rated neighbors to consider.
+
+        Returns:
+        - float: Predicted rating for the movie.
+        """
         movie_index = self.rating_matrix.index.tolist().index(movie_id)
         movie_dists = self.distances[movie_index].tolist()
         movie_neighbors = self.neighbors[movie_index].tolist()
@@ -61,6 +98,17 @@ class CollaborativeFilteringRecSys:
         return self.calculate_rating(neighbors_dists, user_rating_history)
 
     def predict_unseen(self, user_id, verbose=True, rated_neighbors=5):
+        """
+        Predict ratings for unseen movies by a user.
+
+        Args:
+        - user_id (int): User ID.
+        - verbose (bool, optional): Whether to show progress bar or not.
+        - rated_neighbors (int, optional): Number of rated neighbors to consider.
+
+        Returns:
+        - pd.DataFrame: DataFrame with movie_id and predicted ratings for unseen movies.
+        """
         user_rating_history = self.rating_matrix[user_id]
         unseen_movies = user_rating_history[user_rating_history == 0].index
 
@@ -76,6 +124,16 @@ class CollaborativeFilteringRecSys:
         return pd.DataFrame({"movie_id": unseen_movies, "pred_rating": ratings})
 
     def recommend_unseen(self, user_id, top_k=20):
+        """
+        Recommend unseen movies for a user.
+
+        Args:
+        - user_id (int): User ID.
+        - top_k (int, optional): Number of top recommendations to return.
+
+        Returns:
+        - pd.DataFrame: DataFrame with top recommended movies and predicted ratings.
+        """
         rating_predictions = self.predict_unseen(user_id)
         rating_predictions = rating_predictions.sort_values("pred_rating", ascending=False).head(top_k)
         return rating_predictions
